@@ -51,25 +51,28 @@ def realizar_transferencia(usuario):
         balance = exchange.fetch_balance()
         wallet_balance = round(balance["total"].get("USDT", 0), 4)
         kdt = usuario["KdT"]
-        transfer = round(max(wallet_balance - kdt, 0), 4)
+        transfer = max(wallet_balance - kdt, 0)
 
         if transfer <= 0:
             logging.info(f"⚠️ Saldo insuficiente para {usuario['user']}. Saldo: {wallet_balance} USDT")
         else:
-             transfer_id = str(uuid.uuid4())
+            # Generar UUID
+            transfer_id = str(uuid.uuid4())
 
-             transfer_response = exchange.private_post_v5_asset_transfer_inter_transfer({
-                 'transferId': transfer_id,
-                 'coin': 'USDT',
-                 'amount': str(round(transfer, 4)),
-                 'fromAccountType': usuario["type"],
-                 'toAccountType': 'FUND',
-                 'fromMemberId': usuario["UID"],
-                 'toMemberId': 35671204,
-             })
+            # Realizar la transferencia
+            transfer_response = exchange.private_post_v5_asset_transfer_inter_transfer({
+                'transferId': transfer_id,
+                'coin': 'USDT',
+                'amount': str(round(transfer, 4)),
+                'fromAccountType': usuario["type"],
+                'toAccountType': 'FUND',
+                'fromMemberId': usuario["UID"],
+                'toMemberId': 35671204,
+            })
 
-             logging.info(f"✅ Transferencia realizada por {transfer} USDT para {usuario['user']}")
+            logging.info(f"✅ Transferencia realizada por {transfer} USDT para {usuario['user']}")
 
+        # Guardar siempre, incluso si no hubo transferencia
         guardar_registro(usuario, transfer)
 
     except Exception as e:
