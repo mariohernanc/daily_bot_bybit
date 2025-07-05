@@ -20,7 +20,7 @@ logging.basicConfig(
 
 def cargar_usuarios():
     try:
-        with open('user_converted.json', 'r') as f:
+        with open('user.json', 'r') as f:
             users = json.load(f)
         return [u for u in users if u.get("activo", False)]
     except Exception as e:
@@ -32,7 +32,7 @@ def conectar_db():
         conn = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='',
+            password='Marinita1953***sql',
             database='profit_transfer'
         )
         return conn
@@ -51,25 +51,24 @@ def realizar_transferencia(usuario):
         balance = exchange.fetch_balance()
         wallet_balance = round(balance["total"].get("USDT", 0), 4)
         kdt = usuario["KdT"]
-        transfer = max(wallet_balance - kdt, 0)
+        transfer = round(max(wallet_balance - kdt, 0), 4)
 
         if transfer <= 0:
             logging.info(f"⚠️ Saldo insuficiente para {usuario['user']}. Saldo: {wallet_balance} USDT")
-            return
+        else:
+             transfer_id = str(uuid.uuid4())
 
-        transfer_id = str(uuid.uuid4())
+             transfer_response = exchange.private_post_v5_asset_transfer_inter_transfer({
+                 'transferId': transfer_id,
+                 'coin': 'USDT',
+                 'amount': str(round(transfer, 4)),
+                 'fromAccountType': usuario["type"],
+                 'toAccountType': 'FUND',
+                 'fromMemberId': usuario["UID"],
+                 'toMemberId': 35671204,
+             })
 
-        transfer_response = exchange.private_post_v5_asset_transfer_inter_transfer({
-            'transferId': transfer_id,
-            'coin': 'USDT',
-            'amount': str(transfer),
-            'fromAccountType': usuario["type"],
-            'toAccountType': 'FUND',
-            'fromMemberId': usuario["UID"],
-            'toMemberId': 35671204,
-        })
-
-        logging.info(f"✅ Transferencia realizada por {transfer} USDT para {usuario['user']}")
+             logging.info(f"✅ Transferencia realizada por {transfer} USDT para {usuario['user']}")
 
         guardar_registro(usuario, transfer)
 
@@ -120,7 +119,7 @@ def main():
         logging.critical(f"🔥 ERROR GRAVE EN LA EJECUCIÓN PROGRAMADA: {e}")
 
 # Programar la tarea
-schedule.every().day.at("12:00").do(main)  # Ajusta la hora según tu zona horaria
+schedule.every().day.at("21:00").do(main)  # Ajusta la hora según tu zona horaria
 
 if __name__ == "__main__":
     logging.info("🕒 Script iniciado. Esperando próxima ejecución programada...")
