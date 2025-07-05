@@ -1,7 +1,22 @@
-user: ""
-UID: 
-coin: ""
-api_k: ""
-api_s: ""
-type: ""
-KdT: 
+[
+  {
+    "user": "Usuario1",
+    "UID": 35671204,
+    "coin": "USDT",
+    "api_k": "tu_api_key_aqui",
+    "api_s": "tu_api_secret_aqui",
+    "type": "UNIFIED",
+    "KdT": 50.0,
+    "activo": false
+  },
+  {
+    "user": "Usuario2",
+    "UID": 87654321,
+    "coin": "USDT",
+    "api_k": "otra_api_key",
+    "api_s": "otro_api_secret",
+    "type": "FUND",
+    "KdT": 100.0,
+    "activo": false
+  }
+]
