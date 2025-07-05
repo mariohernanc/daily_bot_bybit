@@ -4,26 +4,29 @@ import logging
 import mysql.connector
 import ccxt
 import uuid
-from typing import List, Dict, Optional
+import schedule
 
-# Configuración de logging
+from datetime import datetime
+
+# Configuración del logging para mostrar en consola Y escribir en archivo
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='transferencias.log'
+    handlers=[
+        logging.FileHandler("/var/log/profit_transfer/out.log"),
+        logging.StreamHandler()  # Esto hace que también se muestre en la consola
+    ]
 )
 
-# Cargar configuración del usuario desde JSON
-def cargar_usuarios() -> List[Dict]:
+def cargar_usuarios():
     try:
-        with open('user.json', 'r') as f:
+        with open('user_converted.json', 'r') as f:
             users = json.load(f)
         return [u for u in users if u.get("activo", False)]
     except Exception as e:
-        logging.error(f"Error al cargar usuarios: {e}")
+        logging.error(f"❌ Error al cargar usuarios: {e}")
         raise
 
-# Conectar a la base de datos
 def conectar_db():
     try:
         conn = mysql.connector.connect(
@@ -34,10 +37,9 @@ def conectar_db():
         )
         return conn
     except mysql.connector.Error as err:
-        logging.error(f"Error conectando a la base de datos: {err}")
+        logging.error(f"❌ Error conectando a la base de datos: {err}")
         raise
 
-# Realizar transferencia usando Bybit
 def realizar_transferencia(usuario):
     try:
         exchange = ccxt.bybit({
@@ -52,13 +54,11 @@ def realizar_transferencia(usuario):
         transfer = max(wallet_balance - kdt, 0)
 
         if transfer <= 0:
-            logging.info(f"Saldo insuficiente para {usuario['user']}. Saldo: {wallet_balance} USDT")
+            logging.info(f"⚠️ Saldo insuficiente para {usuario['user']}. Saldo: {wallet_balance} USDT")
             return
 
-        # Generar UUID
         transfer_id = str(uuid.uuid4())
 
-        # Ejecutar transferencia
         transfer_response = exchange.private_post_v5_asset_transfer_inter_transfer({
             'transferId': transfer_id,
             'coin': 'USDT',
@@ -69,15 +69,13 @@ def realizar_transferencia(usuario):
             'toMemberId': 35671204,
         })
 
-        logging.info(f"Transferencia realizada por {transfer} USDT para {usuario['user']}")
+        logging.info(f"✅ Transferencia realizada por {transfer} USDT para {usuario['user']}")
 
-        # Guardar en BD
         guardar_registro(usuario, transfer)
 
     except Exception as e:
-        logging.error(f"Error al procesar {usuario['user']}: {e}")
+        logging.error(f"❌ Error al procesar {usuario['user']}: {e}")
 
-# Guardar registro en la base de datos
 def guardar_registro(usuario, transfer):
     try:
         conn = conectar_db()
@@ -95,32 +93,37 @@ def guardar_registro(usuario, transfer):
         )
         cursor.execute(query, values)
         conn.commit()
-        logging.info("Registro guardado en la base de datos.")
+        logging.info("📌 Registro guardado en la base de datos.")
     except Exception as e:
-        logging.error(f"Error al guardar en la base de datos: {e}")
+        logging.error(f"❌ Error al guardar en la base de datos: {e}")
     finally:
         if 'conn' in locals() and conn.is_connected():
             conn.close()
 
-# Función principal
 def main():
-    usuarios = cargar_usuarios()
-    for usuario in usuarios:
-        realizar_transferencia(usuario)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logging.info(f"🚀 Inicio de ejecución programada ({now})")
 
-# Programador de tareas
-def programar_tarea():
-    import schedule
-    schedule.every().day.at("22:00").do(main)
+    try:
+        usuarios = cargar_usuarios()
+        if not usuarios:
+            logging.warning("⚠️ No hay usuarios activos para procesar.")
+            return
 
+        for usuario in usuarios:
+            logging.info(f"➡️ Procesando usuario: {usuario['user']}")
+            realizar_transferencia(usuario)
+
+        logging.info(f"🏁 Fin de ejecución programada ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
+
+    except Exception as e:
+        logging.critical(f"🔥 ERROR GRAVE EN LA EJECUCIÓN PROGRAMADA: {e}")
+
+# Programar la tarea
+schedule.every().day.at("12:00").do(main)  # Ajusta la hora según tu zona horaria
+
+if __name__ == "__main__":
+    logging.info("🕒 Script iniciado. Esperando próxima ejecución programada...")
     while True:
         schedule.run_pending()
         time.sleep(30)
-
-if __name__ == "__main__":
-    try:
-        programar_tarea()
-    except KeyboardInterrupt:
-        logging.info("Script detenido manualmente.")
-    except Exception as e:
-        logging.critical(f"Error crítico: {e}")
